@@ -11,6 +11,8 @@ python-multipart
 langchain
 langchain-community
 langchain-openai
+langchain-core
+langchain-text-splitters
 
 # Document loading
 pypdf

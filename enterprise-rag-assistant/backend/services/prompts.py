@@ -26,8 +26,8 @@ Why prompts deserve their own module:
 Author: Enterprise RAG Assistant
 """
 
-from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
-from langchain.prompts import HumanMessagePromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate
+from langchain_core.prompts import HumanMessagePromptTemplate
 
 
 # ─────────────────────────────────────────────────────────────────────────────

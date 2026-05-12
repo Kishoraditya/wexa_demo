@@ -58,7 +58,7 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from langchain.schema import Document
+from langchain_core.documents import Document
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from sentence_transformers import CrossEncoder

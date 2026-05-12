@@ -29,7 +29,7 @@ from enum import Enum
 from typing import Optional
 
 from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from backend.core.config import get_config
 from backend.core.logging import get_logger

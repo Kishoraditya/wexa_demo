@@ -49,7 +49,7 @@ import time
 from typing import Optional
 
 import numpy as np
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 from backend.core.config import get_config
 from backend.core.logging import get_logger
