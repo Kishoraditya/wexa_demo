@@ -254,7 +254,7 @@ curl -X POST http://localhost:8000/generate \
 # Edit config.yaml:
 #   models:
 #     primary:
-#       adapter_repo: "your-username/phi3-mini-enterprise-qlora"
+#       adapter_repo: "your-username/enterprise-rag-adapter"
 
 # 2. Ensure HUGGINGFACE_TOKEN is set in .env
 # The API will load the adapter at startup automatically

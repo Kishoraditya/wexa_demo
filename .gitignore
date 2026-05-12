@@ -48,3 +48,4 @@ adapters/
 # Weights & Biases
 .wandb
 
+temp/

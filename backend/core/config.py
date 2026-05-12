@@ -78,7 +78,7 @@ class GenerationConfig:
 class PrimaryModelConfig:
     type: str = "huggingface_peft"
     base_model: str = "microsoft/Phi-3-mini-4k-instruct"
-    adapter_repo: str = "kishoraditya/phi3-mini-enterprise-qlora"
+    adapter_repo: str = "kishoraditya/enterprise-rag-adapter"
     load_in_4bit: bool = True
     device: str = "auto"
 
@@ -256,7 +256,7 @@ def get_config(config_path: str = "config.yaml") -> AppConfig:
         cfg.models = ModelsConfig(
             primary=PrimaryModelConfig(
                 base_model=pri.get("base_model", "microsoft/Phi-3-mini-4k-instruct"),
-                adapter_repo=pri.get("adapter_repo", "kishoraditya/phi3-mini-enterprise-qlora"),
+                adapter_repo=pri.get("adapter_repo", "kishoraditya/enterprise-rag-adapter"),
                 load_in_4bit=pri.get("load_in_4bit", True),
                 device=pri.get("device", "auto"),
             ),
