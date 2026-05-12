@@ -1,0 +1,136 @@
+graph TD
+    %% =========================
+    %% Styling
+    %% =========================
+    classDef latency fill:#f9f,stroke:#333,stroke-width:2px,color:#111;
+    classDef offline fill:#e1f5fe,stroke:#01579b,stroke-width:2px,stroke-dasharray:5 5;
+    classDef online fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    classDef fallback fill:#ffebee,stroke:#b71c1c,stroke-width:2px;
+    classDef cache fill:#ede7f6,stroke:#4527a0,stroke-width:2px;
+    classDef guard fill:#fce4ec,stroke:#880e4f,stroke-width:2px;
+    classDef model fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px;
+    classDef obs fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+
+    %% ======================================================
+    %% OFFLINE INGESTION FLOW
+    %% ======================================================
+    subgraph Offline [Offline Ingestion Flow — Triggered on Document Updates]
+        A[AWS PDF Documents] --> B[Document Loader & Normalizer<br/>PyPDFLoader + Metadata Extraction<br/>source, page, pillar, ingested_at]
+
+        B --> C[Recursive Character Text Splitter<br/>chunk_size=512<br/>overlap=50<br/>Token deduplication<br/>SHA-256 hash check]
+
+        C --> D[Embedding Model<br/>OpenAI text-embedding-3-small<br/>1536 dimensions<br/>Embedding cache via diskcache<br/>chunk hash lookup]
+
+        D --> E[(Pinecone Vector Index<br/>Single index for all 6 pillars<br/>Upsert vectors + metadata<br/>source_pillar filter support)]
+    end
+    class Offline offline
+
+    %% ======================================================
+    %% ONLINE QUERY FLOW
+    %% ======================================================
+    subgraph Online [Online Query Flow — Per User Request]
+
+        %% ---------- CLIENT ----------
+        U(("User / Streamlit UI"))
+        UI[Streamlit Rendering<br/>• Answer text<br/>• Expandable source cards<br/>• Confidence badge<br/>• Latency display<br/>• model_used indicator]
+
+        %% ---------- API GATEWAY ----------
+        U -->|POST /generate| API[FastAPI Gateway<br/>• Input validation<br/>• Request ID assignment<br/>• Future rate limiting]
+
+        API --> G1[Input Guardrails & Validation<br/>• max 1000 chars<br/>• Prompt injection detection<br/>• PII scan / regex validation]
+        class G1 guard
+
+        %% ---------- CACHE ----------
+        G1 --> C1[s58]
+        class C1 cache
+
+        C1 -->|CACHE HIT| HIT[Return Cached Response<br/>Skip downstream pipeline]
+        class HIT cache
+
+        HIT -.-> SLA0([SLA: < 50ms p95])
+        class SLA0 latency
+
+        HIT --> UI
+
+        %% ---------- CACHE MISS ----------
+        C1 -->|CACHE MISS| E1[Query Embedding<br/>text-embedding-3-small<br/>1536-dim vector]
+
+        %% ---------- RETRIEVAL ----------
+        E1 --> R1[Pinecone Retriever<br/>Similarity Search<br/>top-k = 5<br/>score threshold = 0.70<br/>metadata filters available]
+
+        R1 -.-> SLA1([Retrieval SLA<br/>< 200ms p95])
+        class SLA1 latency
+
+        %% ---------- REFUSAL PATH ----------
+        R1 -->|No Results| Z[Refusal Response<br/>'No relevant context found'<br/>No LLM call made]
+        class Z fallback
+
+        Z --> UI
+
+        %% ---------- RERANKER ----------
+        R1 -->|Retrieved Context| R2[Cross-Encoder Reranker<br/>BAAI/bge-reranker-base<br/>Joint query-doc scoring<br/>Optional via USE_RERANKER flag]
+
+        R2 -.-> SLA2([Reranker SLA<br/>< 100ms optional])
+        class SLA2 latency
+
+        %% ---------- PROMPT ----------
+        R2 --> P[Prompt Builder / Constructor<br/>• Grounded system prompt<br/>• Cite sources<br/>• Refuse if unsure<br/>• Self-assess confidence<br/>• Context injection]
+
+        %% ---------- MODEL ROUTER ----------
+        P --> M1[s59]
+
+        %% ---------- PRIMARY MODEL ----------
+        M1 -->|Primary Path| G2[Fine-Tuned Local Model<br/>Phi-3-mini-4k-instruct<br/>+ QLoRA / LoRA Adapter<br/>HF adapter loaded at startup]
+
+        class G2 model
+
+        G2 -.-> SLA3([Generation SLA<br/>< 5s p95])
+        class SLA3 latency
+
+        %% ---------- FALLBACK ----------
+        M1 -->|Fallback Path| M2[OpenAI GPT-4o-mini<br/>Fallback if:<br/>• Adapter load failure<br/>• GPU unavailable<br/>• Timeout > 30s<br/>~$0.001/request<br/>Latency: 1–3s]
+
+        class M2 fallback
+
+        M2 -.-> SLA4([Fallback SLA<br/>< 3s p95])
+        class SLA4 latency
+
+        %% ---------- OUTPUT GUARDRAILS ----------
+        G2 --> V[Post-Generation Guardrails<br/>• Semantic grounding check<br/>• Answer embedding vs chunk embedding<br/>• Threshold = 0.50<br/>• PII redaction<br/>• Hallucination flagging]
+
+        M2 --> V
+
+        class V guard
+
+        %% ---------- RESPONSE BUILDER ----------
+        V --> O["Response Builder / Formatter<br/>{<br/>answer,<br/>sources[],<br/>confidence,<br/>model_used,<br/>retrieval_latency_ms,<br/>generation_latency_ms,<br/>tokens_used,<br/>cache_hit<br/>}"]
+
+        %% ---------- CACHE WRITE ----------
+        O --> C2[L2 Cache Write<br/>Store by query hash<br/>TTL = 1 hour]
+        class C2 cache
+
+        %% ---------- OBSERVABILITY ----------
+        O --> OBS[Observability Layer<br/>• loguru JSON logs<br/>• Prometheus metrics<br/>• /metrics endpoint<br/>• request_id tracking<br/>• latency metrics<br/>• cache_hit tracking<br/>• confidence scoring<br/>• error monitoring]
+
+        class OBS obs
+
+        OBS --> UI
+        UI --> U
+
+    end
+
+    class Online online
+
+    %% ======================================================
+    %% CROSS-FLOW CONNECTIONS
+    %% ======================================================
+    E -.->|Vector Search Source| R1
+
+    %% ======================================================
+    %% END-TO-END LATENCY TARGET
+    %% ======================================================
+    EE([End-to-End SLA<br/>No Cache: < 7s p95])
+    class EE latency
+
+    API -.-> EE
+    

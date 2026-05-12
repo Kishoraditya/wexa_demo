@@ -1,0 +1,50 @@
+# Environment and secrets
+.env
+*.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Cache directories
+.cache/
+logs/
+
+# Data — PDFs are large, track with Git LFS or document separately
+data/pdfs/
+*.faiss
+*.pkl
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model weights — never commit, use HF Hub
+*.bin
+*.safetensors
+*.pt
+*.ckpt
+adapters/
+
+# Weights & Biases
+.wandb
+

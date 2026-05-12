@@ -1,0 +1,70 @@
+# ============================================================
+# Enterprise RAG Assistant — Dependencies
+# ============================================================
+
+# API Framework
+fastapi
+uvicorn[standard]
+python-multipart
+
+# LangChain core stack
+langchain
+langchain-community
+langchain-openai
+langchain-pinecone
+
+# Document loading
+pypdf
+unstructured
+
+# Embeddings and vector store
+openai
+pinecone-client
+
+# Fine-tuned model inference
+torch
+transformers
+peft
+accelerate
+bitsandbytes
+
+# Reranker
+sentence-transformers
+
+# Caching
+diskcache
+
+# Observability
+loguru
+prometheus-fastapi-instrumentator
+
+# Evaluation
+ragas
+evaluate
+datasets
+
+# Validation
+pydantic
+pydantic-settings
+
+# Configuration
+PyYAML
+
+# Frontend
+streamlit
+
+# Testing
+pytest
+pytest-asyncio
+httpx
+
+# Utilities
+python-dotenv
+tqdm
+tenacity
+
+# Document Processing
+tiktoken
+
+# Weights & Biases
+wandb

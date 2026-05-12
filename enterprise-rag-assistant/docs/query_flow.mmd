@@ -1,0 +1,58 @@
+---
+config:
+  layout: elk
+---
+flowchart TD
+    U[User / Client<br/>Streamlit UI]
+    U -->|POST /generate| G
+    G[FastAPI Gateway<br/>- Input validation<br/>- Request ID assignment<br/>- Rate limiting future<br/><br/>Input Guardrails:<br/>• Max 1000 chars<br/>• Prompt injection check<br/>• PII check]
+    G --> C
+    C[L2 Cache Check<br/>diskcache<br/>query hash lookup]
+    C -->|CACHE HIT<br/>< 50ms total| RC[Return Cached Response<br/>Skip all downstream]
+    C -->|CACHE MISS| E
+    E[Embedding<br/>text-embedding-3-small<br/>Query → 1536-dim vector]
+    E --> P
+    P[Pinecone Retriever<br/>Similarity search<br/>top-k = 5<br/>score threshold = 0.70<br/>metadata filter available<br/><br/>Latency budget: < 200ms]
+    P -->|NO RESULTS| RR[Refusal Response<br/>No relevant context found<br/>No LLM call made]
+    P --> R
+    R[Cross-Encoder Reranker<br/>Optional via USE_RERANKER<br/>BAAI/bge-reranker-base<br/>Reorders top-5 by<br/>query-document joint score]
+    R --> PB
+    PB[Prompt Builder<br/>- Grounded system prompt<br/>- Cite sources<br/>- Refuse if unsure<br/>- Self-assess confidence<br/>- Context block injection]
+    PB --> MR
+    MR{Model Router}
+    MR -->|PRIMARY PATH| FT
+    FT[Fine-Tuned Model<br/>Phi-3-mini-4k-instruct<br/>+ LoRA adapter<br/>HF Hub adapter loaded at startup<br/>Latency budget: < 5s]
+    MR -->|FALLBACK PATH| OA
+    OA[OpenAI Fallback<br/>GPT-4o-mini<br/>~$0.001/request<br/>Latency: 1-3s<br/><br/>Triggers:<br/>• Adapter load fail<br/>• GPU unavailable<br/>• Timeout > 30s]
+    FT --> PG
+    OA --> PG
+    PG[Post-Generation Guardrails<br/>- Semantic grounding check<br/>- PII redaction regex scan<br/>- Hallucination flag below threshold<br/><br/>Grounding threshold = 0.50]
+    PG --> RB
+    RB["Response Builder<br/><br/>answer<br/>sources[]<br/>confidence<br/>model_used<br/>retrieval_latency_ms<br/>generation_latency_ms<br/>tokens_used<br/>cache_hit"]
+    RB --> CW
+    CW[L2 Cache Write<br/>Store response by query hash<br/>TTL = 1 hour]
+    CW --> O
+    O[Observability Layer<br/>Runs on every request<br/><br/>- loguru JSON logs<br/>- Prometheus metrics<br/>- /metrics endpoint<br/><br/>Tracks:<br/>request_id<br/>latency<br/>model_used<br/>cache_hit<br/>confidence<br/>error]
+    O --> UR
+    UR[User / Client<br/>Streamlit renders:<br/>• Answer text<br/>• Expandable source cards<br/>• Confidence badge<br/>• Latency display<br/>• model_used indicator]
+    RC --> UR
+    RR --> UR
+    
+    classDef gateway stroke:#818cf8,fill:#eef2ff,color:#1e1b4b
+    classDef cache stroke:#2dd4bf,fill:#f0fdfa,color:#1e1b4b
+    classDef retrieval stroke:#38bdf8,fill:#f0f9ff,color:#1e1b4b
+    classDef model stroke:#a78bfa,fill:#f5f3ff,color:#1e1b4b
+    classDef safety stroke:#fb7185,fill:#fff1f2,color:#1e1b4b
+    classDef response stroke:#4ade80,fill:#f0fdf4,color:#1e1b4b
+    classDef observe stroke:#facc15,fill:#fefce8,color:#1e1b4b
+    classDef ui stroke:#a3e635,fill:#f7fee7,color:#1e1b4b
+    
+    class U,UR ui
+    class G gateway
+    class C,RC,CW cache
+    class E,P,R,RR retrieval
+    class MR,FT,OA model
+    class PB,PG safety
+    class RB response
+    class O observe
+    
