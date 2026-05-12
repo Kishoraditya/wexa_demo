@@ -157,8 +157,8 @@ async def initialize_services(app: FastAPI) -> None:
     if not llm_manager.any_model_available:
         raise RuntimeError(
             "FATAL: No generation model available. "
-            "Check OPENAI_API_KEY environment variable. "
-            "At minimum, the OpenAI fallback must be reachable."
+            "Check OPENROUTER_API_KEY or OPENAI_API_KEY environment variable. "
+            "At minimum, the fallback models must be reachable."
         )
 
     # ── Guardrails ─────────────────────────────────────────────────────────

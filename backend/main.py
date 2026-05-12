@@ -42,7 +42,8 @@ from backend.core.metrics import setup_metrics
 from backend.core.dependencies import initialize_services, shutdown_services
 from backend.routes import generate, ingest, health
 from backend.models.schemas import ErrorResponse
-
+from dotenv import load_dotenv  
+load_dotenv()
 # ── Bootstrap logging before anything else ────────────────────────────────
 # Logging must be initialized before any module that uses get_logger()
 # is imported or instantiated. setup_logging() configures loguru.

@@ -199,8 +199,8 @@ HF Hub fails  primary fails                            │
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/enterprise-rag-assistant
-cd enterprise-rag-assistant
+git clone https://github.com/kishoraditya/wexa-demo
+cd wexa-demo
 
 # 2. Create and activate virtual environment
 python -m venv .venv

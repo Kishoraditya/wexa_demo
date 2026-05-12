@@ -150,8 +150,7 @@ class FineTunedModelLoader:
             # Import here to avoid hard dependency when running without GPU
             # These imports fail gracefully if torch/transformers are not installed
             import torch
-            from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-            from transformers import BitsAndBytesConfig
+            from transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM, pipeline, BitsAndBytesConfig
             from peft import PeftModel
 
             logger.info(
@@ -163,35 +162,51 @@ class FineTunedModelLoader:
                 },
             )
             load_start = time.time()
-
+  
+            # Patch rope_scaling config before loading  
+            cfg = AutoConfig.from_pretrained(  
+                config.models.primary.base_model,  
+                trust_remote_code=True,  
+            )  
+            if hasattr(cfg, "rope_scaling") and cfg.rope_scaling:  
+                if "type" not in cfg.rope_scaling:  
+                    cfg.rope_scaling["type"] = cfg.rope_scaling.get("rope_type", "longrope")  
+            
+            # Load tokenizer
+            self._tokenizer = AutoTokenizer.from_pretrained(  
+                config.models.primary.base_model,  
+                trust_remote_code=True,  
+            )
             # 4-bit NF4 quantization config
             # NF4 (Normal Float 4) is designed specifically for normally distributed
             # weights (which neural network weights are). It achieves better
             # precision than standard INT4 at the same memory footprint.
             # double_quant quantizes the quantization constants themselves,
             # saving an additional ~0.4 bits per parameter.
+            #import torch  
+            cuda_available = torch.cuda.is_available()
             bnb_config = None
-            if config.models.primary.load_in_4bit:
+            if config.models.primary.load_in_4bit and cuda_available: 
                 bnb_config = BitsAndBytesConfig(
                     load_in_4bit=True,
                     bnb_4bit_quant_type="nf4",
                     bnb_4bit_use_double_quant=True,
                     bnb_4bit_compute_dtype=torch.bfloat16,
                 )
-
-            # Load tokenizer
-            self._tokenizer = AutoTokenizer.from_pretrained(
-                config.models.primary.base_model,
-                trust_remote_code=True,  # required for Phi-3
-            )
-
+        
             # Load base model
-            self._model = AutoModelForCausalLM.from_pretrained(
-                config.models.primary.base_model,
-                quantization_config=bnb_config,
-                device_map=config.models.primary.device,
-                trust_remote_code=True,
-                torch_dtype=torch.bfloat16,
+            #import torch
+            #model_dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
+
+            self._model = AutoModelForCausalLM.from_pretrained(  
+                config.models.primary.base_model,  
+                config=cfg,  
+                quantization_config=bnb_config,  
+                #device_map="auto",  
+                trust_remote_code=True,  
+                torch_dtype=torch.float16 if cuda_available else torch.float32,  
+                #attn_implementation="eager", 
+                attn_implementation="sdpa", 
             )
 
             # Apply LoRA adapter on top of base model
@@ -312,26 +327,35 @@ class OpenAIFallback:
     """
 
     def __init__(self):
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            logger.error(
-                "OPENAI_API_KEY not set — fallback generation unavailable. "
-                "Set this environment variable before starting the API."
-            )
+        openrouter_key = os.getenv("OPENROUTER_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY") 
+        if openrouter_key:  
+            self._client = ChatOpenAI(  
+                model="mistralai/mistral-7b-instruct-v0.1",  
+                api_key=openrouter_key,  
+                base_url="https://openrouter.ai/api/v1",  
+                temperature=config.models.fallback.temperature,  
+                max_tokens=config.models.fallback.max_tokens,  
+                timeout=config.generation.timeout_seconds,  
+            )  
+            logger.info("OpenRouter fallback initialized",  
+                        extra={"model": "mistralai/mistral-7b-instruct-v0.1"})  
+        elif openai_key:  
+            self._client = ChatOpenAI(  
+                model=config.models.fallback.model,  
+                temperature=config.models.fallback.temperature,  
+                max_tokens=config.models.fallback.max_tokens,  
+                api_key=openai_key,  
+                timeout=config.generation.timeout_seconds,  
+            )  
+            logger.info("OpenAI fallback initialized",  
+                        extra={"model": config.models.fallback.model})  
+        else:  
+            logger.error(  
+                "Neither OPENROUTER_API_KEY nor OPENAI_API_KEY set — "  
+                "fallback generation unavailable."  
+            )  
             self._client = None
-            return
-
-        self._client = ChatOpenAI(
-            model=config.models.fallback.model,
-            temperature=config.models.fallback.temperature,
-            max_tokens=config.models.fallback.max_tokens,
-            api_key=api_key,
-            timeout=config.generation.timeout_seconds,
-        )
-        logger.info(
-            "OpenAI fallback initialized",
-            extra={"model": config.models.fallback.model},
-        )
 
     def generate(
         self,

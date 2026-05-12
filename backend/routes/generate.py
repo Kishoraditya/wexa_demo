@@ -112,7 +112,7 @@ async def generate_answer(
     # TTL: 1 hour (configured in config.yaml).
     cached_response = _check_cache(request, request_body)
     if cached_response is not None:
-        CACHE_HITS.inc()
+        CACHE_HITS.labels(level="l2_response").inc() 
         REQUESTS_TOTAL.labels(
             status="success", model="cache", endpoint="generate"
         ).inc()
@@ -172,7 +172,7 @@ async def generate_answer(
         status="success", model=model_label, endpoint="generate"
     ).inc()
     RETRIEVAL_LATENCY.observe(response.retrieval_latency_ms / 1000)
-    GENERATION_LATENCY.observe(response.generation_latency_ms / 1000)
+    GENERATION_LATENCY.labels(model=model_label).observe(response.generation_latency_ms / 1000)
 
     if response.tokens_used:
         TOKENS_TOTAL.labels(model=model_label, direction="output").inc(
@@ -180,7 +180,7 @@ async def generate_answer(
         )
 
     if response.model_used == ModelType.OPENAI_FALLBACK:
-        FALLBACK_ACTIVATIONS.inc()
+        FALLBACK_ACTIVATIONS.labels(reason="explicit").inc()
 
     if response.grounding_flag:
         HALLUCINATION_FLAGS.inc()

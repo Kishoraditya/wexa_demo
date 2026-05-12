@@ -123,10 +123,26 @@ class CacheConfig:
     cache_dir: str = ".cache/responses"
     ttl_seconds: int = 3600
 
+@dataclass  
+class AppMetaConfig:  
+    name: str = "Enterprise RAG Assistant"  
+    version: str = "1.0.0"  
+    environment: str = "development"  
+    log_level: str = "INFO"  
+  
+@dataclass  
+class APIConfig:  
+    host: str = "0.0.0.0"  
+    port: int = 8000  
+    workers: int = 1  
+    cors_origins: list[str] = field(default_factory=lambda: ["http://localhost:8501"])  
+ 
 
 @dataclass
 class AppConfig:
     """Root configuration object. All modules depend on this."""
+    app: AppMetaConfig = field(default_factory=AppMetaConfig)
+    api: APIConfig = field(default_factory=APIConfig)   
     ingestion: IngestionConfig = field(default_factory=IngestionConfig)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
     vector_store: VectorStoreConfig = field(default_factory=VectorStoreConfig)

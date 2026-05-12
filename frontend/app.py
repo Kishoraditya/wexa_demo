@@ -142,7 +142,7 @@ def call_generate(
         r = requests.post(  
             f"{BACKEND_URL}/generate",  
             json=payload,  
-            timeout=60,  # fine-tuned model can be slow on CPU  
+            timeout=150,  # fine-tuned model can be slow on CPU  
         )  
         if r.status_code == 200:  
             return r.json()  
@@ -158,7 +158,7 @@ def call_generate(
     except requests.exceptions.ConnectionError:  
         return {"error": f"Cannot connect to backend at {BACKEND_URL}. Is the server running?"}  
     except requests.exceptions.Timeout:  
-        return {"error": "Request timed out after 60s. The model may be loading — try again."}  
+        return {"error": "Request timed out after 150s. The model may be loading — try again."}  
     except Exception as e:  
         return {"error": str(e)}  
   
@@ -191,7 +191,7 @@ def call_upload(file_bytes: bytes, filename: str) -> dict:
         r = requests.post(  
             f"{BACKEND_URL}/ingest/upload",  
             files={"file": (filename, file_bytes, "application/pdf")},  
-            timeout=60,  
+            timeout=150,  
         )  
         if r.status_code == 200:  
             return r.json()  
@@ -423,100 +423,200 @@ def render_sidebar() -> None:
 # Tab 1: Ask  
 # ─────────────────────────────────────────────────────────────────────────────  
   
-def render_ask_tab(use_fine_tuned: bool, top_k: int, filter_pillar: Optional[str]) -> None:  
-    st.header("Ask the AWS Well-Architected Assistant")  
-    st.caption(  
-        "Ask any question about the six AWS Well-Architected pillars. "  
-        "Answers are grounded in the official AWS documentation."  
-    )  
-  
-    # ── Sample questions ──────────────────────────────────────────────────────  
-    with st.expander("Sample questions — click to use", expanded=False):  
-        cols = st.columns(2)  
-        for i, (pillar, question) in enumerate(SAMPLE_QUESTIONS):  
-            icon = PILLAR_ICONS.get(pillar, "📄")  
-            col = cols[i % 2]  
-            if col.button(  
-                f"{icon} {question[:80]}{'...' if len(question) > 80 else ''}",  
-                key=f"sample_{i}",  
-                use_container_width=True,  
-            ):  
-                st.session_state["prefill_query"] = question  
-  
-    # ── Query input ───────────────────────────────────────────────────────────  
-    prefill = st.session_state.pop("prefill_query", "")  
-    query = st.text_area(  
-        "Your question",  
-        value=prefill,  
-        height=100,  
-        max_chars=1000,  
-        placeholder="e.g. How does AWS recommend designing for failure in a multi-AZ deployment?",  
-        label_visibility="collapsed",  
-    )  
-  
-    char_count = len(query)  
-    char_color = "red" if char_count > 950 else "gray"  
-    st.markdown(  
-        f'<p style="color:{char_color};font-size:0.8em;text-align:right;">'  
-        f'{char_count}/1000 characters</p>',  
-        unsafe_allow_html=True,  
-    )  
-  
-    # ── Active settings summary ───────────────────────────────────────────────  
-    model_label = "Phi-3-mini (fine-tuned)" if use_fine_tuned else "GPT-4o-mini (fallback)"  
-    pillar_label = filter_pillar or "All Pillars"  
-    st.caption(  
-        f"Model: **{model_label}** · Top-k: **{top_k}** · Pillar: **{pillar_label}**  "  
-        f"_(change in sidebar)_"  
-    )  
-  
-    submit = st.button("Ask", type="primary", disabled=(not query.strip()))  
-  
-    if submit and query.strip():  
-        health = st.session_state.health_data  
-        if health is None:  
-            st.error(f"Backend is not reachable at `{BACKEND_URL}`. Start the server first.")  
-            return  
-  
-        with st.spinner("Retrieving context and generating answer..."):  
-            start = time.time()  
-            response = call_generate(  
-                query=query.strip(),  
-                use_fine_tuned=use_fine_tuned,  
-                top_k=top_k,  
-                filter_pillar=filter_pillar,  
-            )  
-            elapsed = round((time.time() - start) * 1000)  
-  
-        if "error" in response:  
-            st.error(response["error"])  
-        else:  
-            st.session_state.last_response = response  
-            st.session_state.query_history.insert(  
-                0, {"query": query.strip(), "response": response}  
-            )  
-            render_response(response)  
-  
-    elif st.session_state.last_response and not submit:  
-        # Re-render last response without re-querying  
-        st.markdown("_Showing last response. Submit a new question to update._")  
-        render_response(st.session_state.last_response)  
-  
-    # ── Query history ─────────────────────────────────────────────────────────  
-    if len(st.session_state.query_history) > 1:  
-        st.divider()  
-        with st.expander(  
-            f"Query history ({len(st.session_state.query_history)} queries)", expanded=False  
-        ):  
-            for i, item in enumerate(st.session_state.query_history[1:], start=1):  
-                conf = item["response"].get("confidence", "?")  
-                color = CONFIDENCE_COLORS.get(conf, "gray")  
-                st.markdown(  
-                    f"**{i}.** {item['query'][:100]}  "  
-                    f'<span style="color:{color};font-size:0.8em;">[{conf}]</span>',  
-                    unsafe_allow_html=True,  
-                )  
-  
+def render_ask_tab(
+    use_fine_tuned: bool,
+    top_k: int,
+    filter_pillar: Optional[str],
+) -> None:
+    """Render the chat-based AWS Well-Architected assistant UI."""
+
+    st.header("Ask the AWS Well-Architected Assistant")
+
+    st.caption(
+        "Ask any question about the six AWS Well-Architected pillars. "
+        "Answers are grounded in the official AWS documentation."
+    )
+
+    # ── Session state initialization ────────────────────────────────────────
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    # ── Sample questions ────────────────────────────────────────────────────
+    render_sample_questions()
+
+    # ── Active settings summary ─────────────────────────────────────────────
+    render_settings_summary(
+        use_fine_tuned=use_fine_tuned,
+        top_k=top_k,
+        filter_pillar=filter_pillar,
+    )
+
+    # ── Existing chat history ───────────────────────────────────────────────
+    render_chat_history()
+
+    # ── Pending sample question ─────────────────────────────────────────────
+    pending_message = st.session_state.pop("pending_message", None)
+
+    if pending_message:
+        process_message(
+            message=pending_message,
+            use_fine_tuned=use_fine_tuned,
+            top_k=top_k,
+            filter_pillar=filter_pillar,
+        )
+
+    # ── Chat input ──────────────────────────────────────────────────────────
+    if message := st.chat_input(
+        "Ask about the AWS Well-Architected Framework...",
+        max_chars=1000,
+    ):
+        process_message(
+            message=message,
+            use_fine_tuned=use_fine_tuned,
+            top_k=top_k,
+            filter_pillar=filter_pillar,
+        )
+
+
+def render_sample_questions() -> None:
+    """Render expandable sample question buttons."""
+
+    with st.expander("Sample questions — click to use", expanded=False):
+
+        cols = st.columns(2)
+
+        for i, (pillar, question) in enumerate(SAMPLE_QUESTIONS):
+
+            icon = PILLAR_ICONS.get(pillar, "📄")
+
+            col = cols[i % 2]
+
+            if col.button(
+                f"{icon} {question[:80]}{'...' if len(question) > 80 else ''}",
+                key=f"sample_{i}",
+                use_container_width=True,
+            ):
+                st.session_state.pending_message = question
+                st.rerun()
+
+
+def render_settings_summary(
+    use_fine_tuned: bool,
+    top_k: int,
+    filter_pillar: Optional[str],
+) -> None:
+    """Render current model and retrieval settings."""
+
+    model_label = (
+        "Phi-3-mini (fine-tuned)"
+        if use_fine_tuned
+        else "Fallback (OpenRouter/OpenAI)"
+    )
+
+    pillar_label = filter_pillar or "All Pillars"
+
+    st.caption(
+        f"Model: **{model_label}** · "
+        f"Top-k: **{top_k}** · "
+        f"Pillar: **{pillar_label}** "
+        f"_(change in sidebar)_"
+    )
+
+
+def render_chat_history() -> None:
+    """Render all previous chat messages."""
+
+    for item in st.session_state.chat_history:
+
+        with st.chat_message("user"):
+            st.markdown(item["message"])
+
+        with st.chat_message("assistant"):
+
+            response = item["response"]
+
+            if "error" in response:
+                st.error(response["error"])
+            else:
+                render_response(response)
+
+
+def validate_backend_health() -> bool:
+    """Validate backend availability before processing requests."""
+
+    health = st.session_state.get("health_data")
+
+    if health is None:
+        st.error(
+            f"Backend is not reachable at `{BACKEND_URL}`. "
+            "Start the server first."
+        )
+        return False
+
+    return True
+
+
+def generate_response(
+    message: str,
+    use_fine_tuned: bool,
+    top_k: int,
+    filter_pillar: Optional[str],
+) -> dict:
+    """Execute a single RAG generation request."""
+
+    return call_generate(
+        query=message,
+        use_fine_tuned=use_fine_tuned,
+        top_k=top_k,
+        filter_pillar=filter_pillar,
+    )
+
+
+def process_message(
+    message: str,
+    use_fine_tuned: bool,
+    top_k: int,
+    filter_pillar: Optional[str],
+) -> None:
+    """Process one complete chat turn."""
+
+    message = message.strip()
+
+    if not message:
+        return
+
+    # ── Backend validation ──────────────────────────────────────────────────
+    if not validate_backend_health():
+        return
+
+    # ── Render user message ─────────────────────────────────────────────────
+    with st.chat_message("user"):
+        st.markdown(message)
+
+    # ── Generate and render assistant response ──────────────────────────────
+    with st.chat_message("assistant"):
+
+        with st.spinner("Retrieving context and generating answer..."):
+
+            response = generate_response(
+                message=message,
+                use_fine_tuned=use_fine_tuned,
+                top_k=top_k,
+                filter_pillar=filter_pillar,
+            )
+
+        if "error" in response:
+            st.error(response["error"])
+        else:
+            render_response(response)
+
+    # ── Persist chat history ────────────────────────────────────────────────
+    st.session_state.chat_history.append(
+        {
+            "message": message,
+            "response": response,
+        }
+    )
   
 # ─────────────────────────────────────────────────────────────────────────────  
 # Tab 2: Ingest  
