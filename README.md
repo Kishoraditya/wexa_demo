@@ -8,6 +8,8 @@
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green.svg)](https://fastapi.tiangolo.com)
 [![LangChain](https://img.shields.io/badge/LangChain-0.2-orange.svg)](https://langchain.com)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Kishoraditya/wexa_demo)
+[![HF Space](https://img.shields.io/badge/HuggingFace-Repo-ffcc00?logo=huggingface&logoColor=black)](https://huggingface.co/kishoraditya/enterprise-rag-adapter) 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
