@@ -10,7 +10,7 @@ import hashlib
 from unittest.mock import patch, MagicMock
 from pathlib import Path
 
-from backend.core.logging import RequestLogger, make_cache_key_for_test
+from backend.core.logging import RequestLogger
 from backend.services.guardrails import (
     InputGuardrail,
     OutputGuardrail,

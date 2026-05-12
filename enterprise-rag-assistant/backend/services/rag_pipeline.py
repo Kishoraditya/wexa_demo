@@ -458,12 +458,13 @@ class RAGPipeline:
             ConfidenceParser.parse(raw_text)
         )
 
-        # ── Stage 8: Output guardrail (PII redaction) ──────────────────────
-        redacted_answer, pii_found = self.output_guardrail.redact_pii(clean_answer)
-        if pii_found:
+        # ── Stage 8: Output guardrail (PII redaction) ──────────────────
+        redaction_result = self.output_guardrail.redact_pii(clean_answer)
+        redacted_answer = redaction_result.redacted_text
+        if redaction_result.has_pii:
             logger.warning(
                 "PII detected and redacted from generated answer",
-                extra={"pii_types_found": pii_found},
+                extra={"pii_types_found": redaction_result.pii_found},
             )
 
         # ── Stage 9: Grounding check ───────────────────────────────────────

@@ -184,6 +184,14 @@ def load_directory(directory: Path) -> list[Document]:
 # predictable names. A production system would derive this from document
 # metadata or a manifest file.
 PILLAR_MAP: dict[str, str] = {
+    # Keys match the actual PDF filename stems in data/pdfs/
+    "wellarchitected-operational-excellence-pillar": "Operational Excellence",
+    "wellarchitected-security-pillar": "Security",
+    "wellarchitected-reliability-pillar": "Reliability",
+    "wellarchitected-performance-efficiency-pillar": "Performance Efficiency",
+    "wellarchitected-cost-optimization-pillar": "Cost Optimization",
+    "wellarchitected-sustainability-pillar": "Sustainability",
+    # Also support short names if PDFs are renamed
     "operational_excellence": "Operational Excellence",
     "security": "Security",
     "reliability": "Reliability",

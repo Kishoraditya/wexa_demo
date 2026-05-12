@@ -11,7 +11,6 @@ python-multipart
 langchain
 langchain-community
 langchain-openai
-langchain-pinecone
 
 # Document loading
 pypdf
@@ -19,7 +18,7 @@ unstructured
 
 # Embeddings and vector store
 openai
-pinecone-client
+faiss-cpu
 
 # Fine-tuned model inference
 torch

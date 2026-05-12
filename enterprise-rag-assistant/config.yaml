@@ -36,11 +36,11 @@ ingestion:
 # Embedding
 # ------------------------------------------------------------
 embedding:
-  model: "text-embedding-3-small"     # OpenAI embedding model
-                                      # 1536 dimensions, strong retrieval performance,
-                                      # cost: $0.02 per 1M tokens
-  dimensions: 1536
-  batch_size: 100                     # chunks per embedding API call
+  model: "BAAI/bge-small-en-v1.5"     # Local HuggingFace embedding model
+                                      # 384 dimensions, free, CPU-friendly
+                                      # NDCG@10 = 51.68 on BEIR benchmark
+  dimensions: 384
+  batch_size: 100                     # chunks per embedding call
   cache_enabled: true                 # cache embeddings by chunk hash
   cache_dir: ".cache/embeddings"
 
@@ -48,9 +48,10 @@ embedding:
 # Vector Store
 # ------------------------------------------------------------
 vector_store:
-  provider: "pinecone"                # pinecone | faiss | weaviate | qdrant
+  provider: "faiss"                   # faiss | pinecone | weaviate | qdrant
                                       # swappable via VectorStoreService interface
   index_name: "aws-well-architected"
+  index_dir: "data/faiss_index"       # directory for persisted FAISS index
   
   retrieval:
     top_k: 5                          # number of chunks to retrieve
@@ -86,7 +87,7 @@ models:
   primary:
     type: "huggingface_peft"
     base_model: "microsoft/Phi-3-mini-4k-instruct"
-    adapter_repo: ""                  # set to HF Hub path after fine-tuning
+    adapter_repo: "kishoraditya/phi3-mini-enterprise-qlora"                  # set to HF Hub path after fine-tuning
                                       # e.g. "your-username/phi3-mini-aws-qlora"
     load_in_4bit: true                # QLoRA 4-bit NF4 quantization
     device: "auto"                    # auto | cpu | cuda

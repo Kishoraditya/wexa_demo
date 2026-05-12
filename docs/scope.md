@@ -50,8 +50,8 @@ To maintain a tight engineering boundary, the following features will *not* be i
 
 ## 5. User Journey & System Flow
 1. **User Asks:** The architect submits a query via the client UI: *"How do I implement cost-aware auto-scaling?"*
-2. **System Normalizes & Embeds:** The backend validates the input, checks the Level-2 semantic cache, and if a miss occurs, embeds the query using `text-embedding-3-small`.
-3. **System Retrieves:** The vector store (Pinecone) performs a semantic similarity search, applying a >0.7 confidence threshold to fetch the top 5 relevant document chunks from the Cost Optimization PDF.
+2. **System Normalizes & Embeds:** The backend validates the input, checks the Level-2 semantic cache, and if a miss occurs, embeds the query using `BAAI/bge-small-en-v1.5`.
+3. **System Retrieves:** The vector store (FAISS) performs a semantic similarity search, applying a >0.7 confidence threshold to fetch the top 5 relevant document chunks from the Cost Optimization PDF.
 4. **System Generates (with routing):** The system constructs a grounded prompt. It attempts to route the request to the fine-tuned domain model.
 5. **System Validates:** The generated answer passes through a lightweight hallucination check (comparing response entities to context entities).
 6. **User Receives:** The UI renders the answer, a system confidence score (High/Medium/Low), total latency metrics, and expandable citations showing the exact excerpts from the AWS documentation.
@@ -70,10 +70,10 @@ To maintain a tight engineering boundary, the following features will *not* be i
                               │
                               ▼
   [2] SYSTEM RETRIEVES
-      Query is embedded using the same embedding model used
-      at ingestion time (text-embedding-3-small).
-      Embedded query is compared against the Pinecone vector
-      index. Top-5 most semantically similar chunks are
+       Query is embedded using the same embedding model used
+       at ingestion time (BAAI/bge-small-en-v1.5).
+       Embedded query is compared against the FAISS vector
+       index. Top-5 most semantically similar chunks are
       retrieved, along with their metadata (source pillar,
       page number, section heading).
       Chunks below a similarity threshold (0.60) are dropped.
@@ -123,9 +123,9 @@ To maintain a tight engineering boundary, the following features will *not* be i
 
 * **Graceful Degradation (OpenAI Fallback):** The system assumes that local inference may fail due to startup errors, high latency, unavailable GPU resources, or Hugging Face Hub connectivity issues. In such cases, generation transparently falls back to `GPT-4o-mini`. The fallback path is treated as a first-class inference mode rather than a degraded state, and every response logs `model_used` for observability.
 
-* **Swappable Vector Store Interface:** Although Pinecone is used for development and production simulation, the vector layer is abstracted behind a `VectorStoreService` interface to support future migration to FAISS, Weaviate, or Qdrant without modifying the RAG pipeline. This assumption supports potential enterprise requirements around cost control, on-premise deployment, and data residency compliance.
+* **Swappable Vector Store Interface:** Although FAISS is used for development and single-node deployment, the vector layer is abstracted behind a `VectorStoreService` interface to support future migration to Pinecone, Weaviate, or Qdrant without modifying the RAG pipeline. This assumption supports potential enterprise requirements around horizontal scaling, multi-tenant isolation, and managed infrastructure.
 
-* **Single-User, Single-Index Deployment:** Due to Pinecone free-tier limitations, all six pillar documents share a single index and are differentiated using metadata (`source_pillar`). Cross-pillar retrieval is supported, while pillar-specific filtering is implemented through metadata filters. Multi-tenant isolation would require namespaces or a paid deployment tier.
+* **Single-User, Single-Index Deployment:** All six pillar documents share a single FAISS index and are differentiated using metadata (`source_pillar`). Cross-pillar retrieval is supported, while pillar-specific filtering is implemented through post-retrieval metadata filters. Multi-tenant isolation would require migrating to a managed vector store (e.g., Pinecone namespaces) or a distributed solution.
 
 * **Manually Curated Evaluation Corpus:** The evaluation dataset (20–30 Q&A pairs) is manually authored against known document content. Automated dataset generation is out of scope. As a result, evaluation metrics and RAGAS scores should be interpreted as directional indicators of retrieval quality rather than statistically significant benchmarks.
 

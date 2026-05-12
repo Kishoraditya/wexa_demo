@@ -134,28 +134,28 @@ class TestOutputGuardrail:
 
     def test_clean_text_unchanged(self):
         text = "Design for failure using multiple availability zones."
-        redacted, found = self.guardrail.redact_pii(text)
-        assert redacted == text
-        assert found == []
+        result = self.guardrail.redact_pii(text)
+        assert result.redacted_text == text
+        assert not result.has_pii
 
     def test_email_redacted(self):
         text = "Contact admin@example.com for support."
-        redacted, found = self.guardrail.redact_pii(text)
-        assert "admin@example.com" not in redacted
-        assert "[REDACTED_EMAIL]" in redacted
-        assert "email" in found
+        result = self.guardrail.redact_pii(text)
+        assert "admin@example.com" not in result.redacted_text
+        assert "[REDACTED_EMAIL]" in result.redacted_text
+        assert "email" in result.pii_found
 
     def test_aws_access_key_redacted(self):
         text = "The key AKIAIOSFODNN7EXAMPLE should not appear."
-        redacted, found = self.guardrail.redact_pii(text)
-        assert "AKIAIOSFODNN7EXAMPLE" not in redacted
-        assert "aws_access_key" in found
+        result = self.guardrail.redact_pii(text)
+        assert "AKIAIOSFODNN7EXAMPLE" not in result.redacted_text
+        assert "aws_access_key" in result.pii_found
 
     def test_multiple_pii_types_all_redacted(self):
         text = "Email: user@test.com. Phone: 555-123-4567."
-        redacted, found = self.guardrail.redact_pii(text)
-        assert "user@test.com" not in redacted
-        assert len(found) >= 1
+        result = self.guardrail.redact_pii(text)
+        assert "user@test.com" not in result.redacted_text
+        assert len(result.pii_found) >= 1
 
 
 class TestNoContextRefusal:

@@ -39,8 +39,8 @@ class IngestionConfig:
 
 @dataclass
 class EmbeddingConfig:
-    model: str = "text-embedding-3-small"
-    dimensions: int = 1536
+    model: str = "BAAI/bge-small-en-v1.5"
+    dimensions: int = 384
     batch_size: int = 100
     cache_enabled: bool = True
     cache_dir: str = ".cache/embeddings"
@@ -55,7 +55,7 @@ class RetrievalConfig:
 
 @dataclass
 class VectorStoreConfig:
-    provider: str = "pinecone"
+    provider: str = "faiss"
     index_name: str = "aws-well-architected"
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
 
@@ -78,7 +78,7 @@ class GenerationConfig:
 class PrimaryModelConfig:
     type: str = "huggingface_peft"
     base_model: str = "microsoft/Phi-3-mini-4k-instruct"
-    adapter_repo: str = ""
+    adapter_repo: str = "kishoraditya/phi3-mini-enterprise-qlora"
     load_in_4bit: bool = True
     device: str = "auto"
 
@@ -213,8 +213,8 @@ def get_config(config_path: str = "config.yaml") -> AppConfig:
     if "embedding" in raw:
         emb = raw["embedding"]
         cfg.embedding = EmbeddingConfig(
-            model=emb.get("model", "text-embedding-3-small"),
-            dimensions=emb.get("dimensions", 1536),
+            model=emb.get("model", "BAAI/bge-small-en-v1.5"),
+            dimensions=emb.get("dimensions", 384),
             batch_size=emb.get("batch_size", 100),
             cache_enabled=emb.get("cache_enabled", True),
             cache_dir=emb.get("cache_dir", ".cache/embeddings"),
@@ -224,7 +224,7 @@ def get_config(config_path: str = "config.yaml") -> AppConfig:
         vs = raw["vector_store"]
         ret = vs.get("retrieval", {})
         cfg.vector_store = VectorStoreConfig(
-            provider=vs.get("provider", "pinecone"),
+            provider=vs.get("provider", "faiss"),
             index_name=vs.get("index_name", "aws-well-architected"),
             retrieval=RetrievalConfig(
                 top_k=ret.get("top_k", 5),
@@ -256,7 +256,7 @@ def get_config(config_path: str = "config.yaml") -> AppConfig:
         cfg.models = ModelsConfig(
             primary=PrimaryModelConfig(
                 base_model=pri.get("base_model", "microsoft/Phi-3-mini-4k-instruct"),
-                adapter_repo=pri.get("adapter_repo", ""),
+                adapter_repo=pri.get("adapter_repo", "kishoraditya/phi3-mini-enterprise-qlora"),
                 load_in_4bit=pri.get("load_in_4bit", True),
                 device=pri.get("device", "auto"),
             ),
